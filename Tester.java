@@ -13,12 +13,12 @@ public class Tester{
     Scanner kb = new Scanner(System.in);
 
     while(true){
-      System.out.print("Conditions: ");
+      System.out.print("Conditions ~~ ");
       String input = kb.next();
 
       if(input.equalsIgnoreCase("q")) break;
-
       MyAVData bruh = new MyAVData(input);
+
       bruh.printConditions();
     }
   }
