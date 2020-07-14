@@ -2,7 +2,7 @@ import java.util.*;
 import java.io.*;
 import java.awt.*;
 
-public class MyAVData{
+public class DataManager{
 
   //importing related instance variables
   private final String DIRECTORY;
@@ -21,11 +21,11 @@ public class MyAVData{
   private boolean debugging = true;
 
 
-  public MyAVData(String dir){
+  public DataManager(String dir){
     DIRECTORY = dir; //enables the client to use any set of files across any directory
   }
 
-  public MyAVData(){
+  public DataManager(){
     DIRECTORY = System.getProperty("user.dir") +"\\data"; //works in current subdirectory "data"
   }
 
