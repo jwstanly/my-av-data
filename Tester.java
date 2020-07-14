@@ -17,9 +17,21 @@ public class Tester{
       String input = kb.next();
 
       if(input.equalsIgnoreCase("q")) break;
-      MyAVData bruh = new MyAVData(input);
 
-      bruh.printConditions();
+      try{
+          MyAVData bruh = new MyAVData(input);
+          bruh.printConditions();
+      }
+      catch(IllegalArgumentException e){
+        System.out.print("Bad arguments. Try again. Details: ");
+        e.printStackTrace();
+      }
+      catch(Exception e){
+        System.out.print("Something went wrong. Try again. Details: ");
+        e.printStackTrace();
+      }
+
+
     }
   }
 }

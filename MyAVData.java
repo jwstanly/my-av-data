@@ -5,39 +5,45 @@ import java.awt.*;
 public class MyAVData{
 
   //importing related instance variables
+  private final String DIRECTORY;
   private static final String[] OP_CODE = {"VALUE","RANGE","SERIES"}; //importance discussed in importData()
   private String[] CATAGORY;
   private HashMap<String,ArrayList<String>> FILTER;
   private int[] DATE;
+  private boolean noFilters;
 
   //post import, analysis instance variables
   private ArrayList<ArrayList<String>> DATA = new ArrayList<ArrayList<String>>();
   private ArrayList<String> DATA_CATAGORY = new ArrayList<String>();
+  private HashMap<String,HashMap<String,String>> LOOKUP_TABLE = new HashMap<String,HashMap<String,String>>();
 
   //misc
   private boolean debugging = true;
 
-  public MyAVData(String argument){
-    parseArgument(argument);
-    importData();
-    printData();
+
+  public MyAVData(String dir){
+    DIRECTORY = dir; //enables the client to use any set of files across any directory
   }
 
-  //-------EXAMPLE INPUT FORMAT--------
-  //catagorys:filters:dates
-  //cat1,cat2,catN:cat1.val1,cat2.(range1,range2),cat3.[val1,val2,val3]:date1-date2
-  //cat1 , cat2 , catN : cat1.val1 , cat2.(startRange-endRange) , cat3.[val1-val2-val3-valN] : date1 , date2
+  public MyAVData(){
+    DIRECTORY = System.getProperty("user.dir") +"\\data"; //works in current subdirectory "data"
+  }
+
   public void parseArgument(String argument) throws IllegalArgumentException{
-    //checks over the truth table below for possible argument combinations and their resultant authencitiy...
-    //true means the arugument is accepted, false means it is not allowed
-    /*  C:F:D   true
-         :F:D   true
-        C: :D   true
-        C:F:    false
-        C: :    false
-         :F:    false
-         : :D   false
-         : :    false */
+    //-------EXAMPLE INPUT FORMAT--------
+    //catagorys:filters:dates
+    //cat1,cat2,catN:cat1.val1,cat2.(range1,range2),cat3.[val1,val2,val3]:date1-date2
+    //cat1 , cat2 , catN : cat1.val1 , cat2.(startRange-endRange) , cat3.[val1-val2-val3-valN] : date1 , date2
+                  //checks over the truth table below for possible argument combinations and their resultant authencitiy...
+                  //true means the arugument is accepted, false means it is not allowed
+                  /*  C:F:D   true
+                       :F:D   true
+                      C: :D   true
+                      C:F:    false
+                      C: :    false
+                       :F:    false
+                       : :D   false
+                       : :    false */
 
       if( argument.substring(0,2).equals("::") || argument.substring(argument.length()-1,argument.length()).equals(":") ){
         throw new IllegalArgumentException("Arguments must be in Catagories:Filters:Dates format");
@@ -60,7 +66,11 @@ public class MyAVData{
     //Assigns filters... if only filters were as simple as catagories and dates :(
       FILTER = new HashMap<String,ArrayList<String>>();
 
+      //checks for filters
+        noFilters = filterPairs.length()==0 ? true : false;
+
       //IF THEY'RE FILTERS, goes through every filter pair
+      if(!noFilters)
       for(String pair : filterPairs.split(",")){
 
         //splits into raw keys and values
@@ -118,21 +128,42 @@ public class MyAVData{
             FILTER.put(key, valueList);
           }
         }
-      }
+      } //end of filter pair loop
 
     //imports Dates... very easy like catagories (just now with String->int conversion)
-    String temp[] = dateArg.split(",");
-    DATE = new int[temp.length];
-    for(int x=0;x<temp.length;x++){
-      //converts string to int
-      try{
-        DATE[x] = Integer.parseInt(temp[x]);
-      }
-      catch(NumberFormatException e){
-        e.printStackTrace();
+    boolean dateRange = dateArg.substring(0,1).equals("(") ? true : false;
+
+    if(dateRange){
+      dateArg = dateArg.substring(1,dateArg.length()-1); //removes trailing paranthesis
+      String temp[] = dateArg.split("-");
+      int lowerBoundary = Integer.parseInt(temp[0]);
+      int upperBoundary = Integer.parseInt(temp[1]);
+      int range = upperBoundary - lowerBoundary;
+
+      //finds only valid files (this helps when the client imports a range of date files)
+      ArrayList<Integer> filteredDate = new ArrayList<Integer>();
+      for(int date=lowerBoundary;date<=upperBoundary;date++)
+        if( (new File(DIRECTORY + "\\" + date + ".csv")).exists() )
+          filteredDate.add(date);
+
+      DATE = new int[filteredDate.size()];
+      for(int x=0;x<DATE.length;x++)
+        DATE[x] = filteredDate.get(x);
+
+    }
+    else{
+      String temp[] = dateArg.split(",");
+      DATE = new int[temp.length];
+      for(int x=0;x<temp.length;x++){
+        //converts string to int
+        try{
+          DATE[x] = Integer.parseInt(temp[x]);
+        }
+        catch(NumberFormatException e){
+          e.printStackTrace();
+        }
       }
     }
-
 
   }
 
@@ -140,23 +171,26 @@ public class MyAVData{
     //ArrayList to hold all sucsessful rows through filtering
       ArrayList<String[]> filteredRows = new ArrayList<String[]>();
 
-    for(int monthIndex=0 ; monthIndex < DATE.length ; monthIndex++){
+    //records if the file loop has already ran once. Useful for one time code segments
+      boolean firstIteration = true;
+
+    for(int fileIndex=0 ; fileIndex < DATE.length ; fileIndex++){
       //import file
-        String fileName = "" + DATE[monthIndex] + ".csv";
+        String fileName = "" + DATE[fileIndex] + ".csv";
         File data = null;
         Scanner kb = null;
         try{
-          data = new File("data\\"+fileName);
+          data = new File(DIRECTORY+"\\"+fileName);
           kb = new Scanner(data);
         }
         catch(FileNotFoundException e){
           e.printStackTrace();
         }
 
-      //establishes headers (and a final version for the lambda below)
+      //establishes headers
         String[] HEADER = (kb.next()).split(",");
 
-      //locates filter keys/headers and their index BEFORE reading every row
+      //locates filter keys (csv headers) and their index BEFORE reading every row
         ArrayList<Integer> keyIndex = new ArrayList<Integer>();
 
         FILTER.entrySet().forEach(entry -> {
@@ -170,42 +204,50 @@ public class MyAVData{
 
       //CAUTION: VERY COMPUTATIONALLY INTENSIVE
       //iterates through EVERY line of the CSV
-        while(kb.hasNext()){
+        //if no filters
+        if(noFilters){
+          while(kb.hasNext()){
+            final String[] row = kb.next().split(",");
+            filteredRows.add(row);
+          }
+        }
+        //if filters
+        else{
+          while(kb.hasNext()){
 
-          final String[] row = kb.next().split(",");
+            final String[] row = kb.next().split(",");
 
-          //filter VALUE matches
-          FILTER.entrySet().forEach(entry -> {
+            //filter VALUE matches
+            FILTER.entrySet().forEach(entry -> {
 
-            final String typeOfValue = entry.getValue().get(0);
-            switch(typeOfValue){
-              case "VALUE" -> {
+              final String typeOfValue = entry.getValue().get(0); //one of the OP_CODE's (value, range, series)
+              switch(typeOfValue){
+                case "VALUE" -> {
 
-                for(int i : keyIndex)
-                  if(row[i].equals(entry.getValue().get(1)))
-                    filteredRows.add(row);
-
-              }
-              case "RANGE" -> {
-
-                for(int i : keyIndex)
-                  if( Integer.parseInt(entry.getValue().get(1)) <= Integer.parseInt(row[i]) &&
-                      Integer.parseInt(entry.getValue().get(2)) >= Integer.parseInt(row[i])   )
-                    filteredRows.add(row);
-
-              }
-              case "SERIES" -> {
-
-                for(String value : entry.getValue())
                   for(int i : keyIndex)
-                    if(row[i].equals(value))
+                    if(row[i].equals(entry.getValue().get(1)))
                       filteredRows.add(row);
 
+                }
+                case "RANGE" -> {
+
+                  for(int i : keyIndex)
+                    if( Integer.parseInt(entry.getValue().get(1)) <= Integer.parseInt(row[i]) &&
+                        Integer.parseInt(entry.getValue().get(2)) >= Integer.parseInt(row[i])   )
+                      filteredRows.add(row);
+
+                }
+                case "SERIES" -> {
+
+                  for(String value : entry.getValue())
+                    for(int i : keyIndex)
+                      if(row[i].equals(value))
+                        filteredRows.add(row);
+
+                }
               }
-            }
-
-
-          });
+            });
+          }
         }
 
       //closes the Scanner
@@ -222,18 +264,21 @@ public class MyAVData{
         //adds the headers to the DATA_CATAGORY
           boolean noCatagories = CATAGORY.length == 1 && CATAGORY[0].length() == 0;
 
-          if(noCatagories){
-            ArrayList<String> tempRow = new ArrayList<String>();
-            for(String header : HEADER){
-              DATA_CATAGORY.add(header);
+          if(firstIteration){
+            if(noCatagories){
+              ArrayList<String> tempRow = new ArrayList<String>();
+              for(String header : HEADER){
+                DATA_CATAGORY.add(header);
+              }
+            }
+            else{
+              ArrayList<String> tempRow = new ArrayList<String>();
+              for(int i : catIndex){
+                DATA_CATAGORY.add(HEADER[i]);
+              }
             }
           }
-          else{
-            ArrayList<String> tempRow = new ArrayList<String>();
-            for(int i : catIndex){
-              DATA_CATAGORY.add(HEADER[i]);
-            }
-          }
+
 
 
       //iterates through valid filteredRows
@@ -254,9 +299,103 @@ public class MyAVData{
           DATA.add(tempRow);
         }
 
-      System.out.println("File "+(monthIndex+1) +"/"+ DATE.length + " parsed");
+      System.out.println("File "+(fileIndex+1) +"/"+ DATE.length + " parsed");
 
+      firstIteration = false;
     } // <-- bracket for month for loop
+
+  }
+
+  public void importLookupTables() throws IllegalArgumentException{
+    for(String catagoryName : DATA_CATAGORY){
+      if( (new File(DIRECTORY+"\\lookupTables\\L_"+catagoryName+".csv_")).exists() ){
+        File input = null;
+        Scanner kb = null;
+        try{
+          input = new File(DIRECTORY+"\\lookupTables\\L_"+catagoryName+".csv_");
+          kb = new Scanner(input);
+        }
+        catch(FileNotFoundException e){
+          System.out.println("The catagory "+catagoryName+" did not have a lookup table. Perhaps it does not use a lookup table");
+          e.printStackTrace();
+        }
+
+        HashMap<String,String> tempMap = new HashMap<String,String>();
+
+        //skip headers
+        kb.nextLine();
+
+        int c=0; //debugging/exception counter
+        while(kb.hasNext()){
+          String next = kb.nextLine();
+          String[] args = next.split(",");
+            if(args.length<2) throw new IllegalArgumentException("Cannot make a HashMap from less than two values. Error details...\nLine: " + c + "\nCategory: " + catagoryName +"\nCsv text: "+ next +"\nArray: "+ Arrays.toString(args));
+          String key = args[0];
+          String value = "";
+          for(int x=1;x<args.length;x++)
+            value+=args[x];
+          tempMap.put(key,value);
+
+          c++; //debugging counter
+        }
+
+        LOOKUP_TABLE.put(catagoryName, tempMap);
+      }
+    }
+  }
+
+  public void useLookupValues(){
+    for(String catagoryName : DATA_CATAGORY){
+      if(LOOKUP_TABLE.containsKey(catagoryName)){
+        int cat = DATA_CATAGORY.indexOf(catagoryName);
+        for(int x=0;x<DATA.size();x++){
+          if( LOOKUP_TABLE.get(catagoryName).containsKey( "\""+DATA.get(x).get(cat)+"\"" )) {
+            DATA.get(x).set(cat, LOOKUP_TABLE.get(catagoryName).get("\""+DATA.get(x).get(cat)+"\""));
+          }
+        }
+      }
+    }
+  }
+
+  public void stopLookupValues(){
+    //soon to be method
+    //this will reverse values imported from lokup table hashmaps, returning them to their raw data types
+  }
+
+  public void exportToCSV(){
+
+    long time = System.currentTimeMillis();
+    String csvName = ""+time+".csv";
+
+    File output = null;
+    FileWriter fw = null;
+    PrintWriter pw = null;
+    try{
+      output = new File(csvName);
+      fw = new FileWriter(output);
+      pw = new PrintWriter(fw);
+    }
+    catch(IOException e){
+      e.printStackTrace();
+    }
+
+    for(String header : DATA_CATAGORY)
+      pw.print(header+",");
+    pw.print("\n");
+
+    for(ArrayList<String> row : DATA){
+      for(String item : row)
+        pw.print(item+",");
+      pw.print("\n");
+    }
+
+    try{
+      pw.close();
+      fw.close();
+    }
+    catch(IOException e){
+      e.printStackTrace();
+    }
 
   }
 
@@ -269,7 +408,6 @@ public class MyAVData{
     System.out.print("\n");
   }
 
-
   public void printData(){
     System.out.println("CATAGORIES: "+Arrays.toString(DATA_CATAGORY.toArray()));
     for(int x=0;x<DATA.size();x++)
@@ -277,27 +415,3 @@ public class MyAVData{
     System.out.println("\nDATA SIZE: "+ DATA.size());
   }
 }
-
-//String[][][] filter = new String[/*order*/][/*key/value(type)*/][/*arg*/];
-
-  //Ok, the filter array is nasty. I'm sorry there's probably a better way to implement this,
-  //but bare with me along with my very novice data skills. The array's 3 pointers represent...
-  //ORDER - the sequenced number of the input
-  //KEY/VALUE(TYPE) - specificies which kind of arg it is, and whether the arg is a...
-    //0 - key
-    //1 - standard value
-    //2 - start range for values
-    //3 - end range for values
-    //4 - value in list of values
-  //ARG - the value itself
-
-  //Here is an example flow down...
-    //filter[] = { cat1.val1 , cat2.(startRange,endRange) , cat3.[val1,val2,val3,valN] }
-
-      //filter[x] = cat1.val1
-        //filter[x][] = {cat1 , val1}
-          //filter[x][y] = cat1
-
-      //filter[x] = cat2.(startRange,endRange)
-        //filter
-      //filter[x] = cat3.[val1,val2,val3,valN]
