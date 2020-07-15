@@ -28,7 +28,7 @@ public class Driver{
       switch(input[0]){
 
         case "print" -> {
-          MyAVData temp = new MyAVData();
+          DataManager temp = new DataManager();
           temp.parseArgument(input[1]);
           temp.printConditions();
 
@@ -41,11 +41,24 @@ public class Driver{
         }
 
         case "csv" -> {
-          MyAVData temp = new MyAVData();
+          DataManager temp = new DataManager();
           temp.parseArgument(input[1]);
           temp.importData();
 
           temp.exportToCSV();
+        }
+
+        case "sort" -> {
+          DataManager temp = new DataManager();
+          temp.parseArgument(input[2]);
+          temp.importData();
+
+          temp.sortBy(input[1]);
+
+          temp.importLookupTables();
+          temp.useLookupValues();
+          temp.printData();
+
         }
 
         default -> System.out.println("Unkown argument. Try again.");

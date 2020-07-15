@@ -5,8 +5,8 @@ import java.awt.*;
 public class DataManager{
 
   //importing related instance variables
-  private final String DIRECTORY;
   private static final String[] OP_CODE = {"VALUE","RANGE","SERIES"}; //importance discussed in importData()
+  private final String DIRECTORY;
   private String[] CATAGORY;
   private HashMap<String,ArrayList<String>> FILTER;
   private int[] DATE;
@@ -44,6 +44,8 @@ public class DataManager{
                        :F:    false
                        : :D   false
                        : :    false */
+
+    //clear(); //removes previous arguments
 
       if( argument.substring(0,2).equals("::") || argument.substring(argument.length()-1,argument.length()).equals(":") ){
         throw new IllegalArgumentException("Arguments must be in Catagories:Filters:Dates format");
@@ -397,6 +399,101 @@ public class DataManager{
       e.printStackTrace();
     }
 
+  }
+
+  public void sortBy(String inputCatagory){
+    //finds which catagory to sort by
+    int i = 0;
+    for(int x=0;x<DATA_CATAGORY.size();x++)
+      if(inputCatagory.equalsIgnoreCase(DATA_CATAGORY.get(x)))
+        i = x;
+
+    final int catIndex = i; //must be final for inner class
+
+    //conversion to normal array
+    String[][] dataArr = new String[DATA.size()][DATA.get(0).size()];
+    for(int x=0;x<DATA.size();x++){
+      for(int y=0;y<DATA.get(x).size();y++){
+        dataArr[x][y] = DATA.get(x).get(y);
+      }
+    }
+
+    class QuickSort{
+      public int partition(String arr[][], int low, int high){
+        int pivot = Integer.parseInt(arr[high][catIndex]);
+        int i = low-1; // index of smaller element
+        for(int j=low; j<high; j++){
+          // If current element is smaller than or
+          // equal to pivot
+          if(Integer.parseInt(arr[j][catIndex]) <= pivot){
+              i++;
+
+              // swap arr[i] and arr[j]
+              String[] temp = arr[i];
+              arr[i] = arr[j];
+              arr[j] = temp;
+          }
+        }
+
+        // swap arr[i+1] and arr[high] (or pivot)
+        String[] temp = arr[i+1];
+        arr[i+1] = arr[high];
+        arr[high] = temp;
+
+        return i+1;
+      }
+
+        /* The main function that implements QuickSort()
+          arr[] --> Array to be sorted,
+          low  --> Starting index,
+          high  --> Ending index */
+      public void sort(String arr[][], int low, int high){
+        if(low < high){
+            /* pi is partitioning index, arr[pi] is
+              now at right place */
+            int pi = partition(arr, low, high);
+
+            // Recursively sort elements before
+            // partition and after partition
+            sort(arr, low, pi-1);
+            sort(arr, pi+1, high);
+        }
+      }
+    }
+
+    QuickSort qs = new QuickSort();
+    qs.sort(dataArr, 0, dataArr.length-1);
+
+    for(int x=0;x<DATA.size();x++){
+      for(int y=0;y<DATA.get(x).size();y++){
+        DATA.get(x).set(y, dataArr[x][y]);
+      }
+    }
+  }
+
+  public ArrayList<ArrayList<String>> getData(){
+    return DATA;
+  }
+
+  public ArrayList<String> getDataCatagories(){
+    return DATA_CATAGORY;
+  }
+
+  public HashMap<String,HashMap<String,String>> getLookupTables(){
+    return LOOKUP_TABLE;
+  }
+
+  public void clear(){
+    //importing related instance variables
+    CATAGORY = null;
+    FILTER = null;
+    DATE = null;
+    noFilters = true;
+
+    //post import, analysis instance variables
+    DATA = null;
+    DATA_CATAGORY = null;
+    LOOKUP_TABLE = null;
   }
 
   public void printConditions(){
