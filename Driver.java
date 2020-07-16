@@ -30,9 +30,8 @@ public class Driver{
         case "print" -> {
           DataManager temp = new DataManager();
           temp.parseArgument(input[1]);
-          temp.printConditions();
 
-          temp.importData();
+          temp.printConditions();
           temp.printData();
 
           temp.importLookupTables();
@@ -43,7 +42,6 @@ public class Driver{
         case "csv" -> {
           DataManager temp = new DataManager();
           temp.parseArgument(input[1]);
-          temp.importData();
 
           temp.exportToCSV();
         }
@@ -51,14 +49,68 @@ public class Driver{
         case "sort" -> {
           DataManager temp = new DataManager();
           temp.parseArgument(input[2]);
-          temp.importData();
 
-          temp.sortBy(input[1]);
+          temp.sort(input[1]);
 
           temp.importLookupTables();
           temp.useLookupValues();
           temp.printData();
 
+        }
+
+        case "freq" -> {
+          DataManager temp = new DataManager();
+          temp.parseArgument(input[3]);
+
+          temp.importLookupTables();
+          temp.useLookupValues();
+
+          temp.frequency(Boolean.parseBoolean(input[2]), input[1]);
+        }
+
+        case "serialize" -> {
+          DataManager temp = new DataManager();
+          temp.parseArgument(input[1]);
+
+          temp.importLookupTables();
+          temp.useLookupValues();
+
+          try{
+            FileOutputStream fileOut = new FileOutputStream("DataManagerObjectSerialBytes.ser");
+            ObjectOutputStream out = new ObjectOutputStream(fileOut);
+            out.writeObject(temp);
+            System.out.println("Sucsessfully serialized");
+            out.close();
+            fileOut.close();
+          }
+          catch(IOException e){
+            System.out.println("Failure to serlialize DataManager object");
+            e.printStackTrace();
+          }
+        }
+
+        case "deserialize" -> {
+          DataManager temp = null;
+
+          try{
+            FileInputStream fileIn = new FileInputStream("DataManagerObjectSerialBytes.ser");
+            ObjectInputStream in = new ObjectInputStream(fileIn);
+            temp = (DataManager)in.readObject();
+            System.out.println("Sucsessfully deserialized");
+            in.close();
+            fileIn.close();
+          }
+          catch(IOException e){
+            System.out.println("Failure to deserlialize DataManager object");
+            e.printStackTrace();
+          }
+          catch(ClassNotFoundException e){
+            System.out.println("DataManager class not found");
+            e.printStackTrace();
+          }
+
+          temp.printConditions();
+          temp.printData();
         }
 
         default -> System.out.println("Unkown argument. Try again.");

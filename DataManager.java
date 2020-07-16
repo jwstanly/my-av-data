@@ -2,7 +2,7 @@ import java.util.*;
 import java.io.*;
 import java.awt.*;
 
-public class DataManager{
+public class DataManager implements Serializable{
 
   //importing related instance variables
   private static final String[] OP_CODE = {"VALUE","RANGE","SERIES"}; //importance discussed in importData()
@@ -11,6 +11,7 @@ public class DataManager{
   private HashMap<String,ArrayList<String>> FILTER;
   private int[] DATE;
   private boolean noFilters;
+  private boolean argumentsAlreadyParsed = false;
 
   //post import, analysis instance variables
   private ArrayList<ArrayList<String>> DATA = new ArrayList<ArrayList<String>>();
@@ -18,7 +19,8 @@ public class DataManager{
   private HashMap<String,HashMap<String,String>> LOOKUP_TABLE = new HashMap<String,HashMap<String,String>>();
 
   //misc
-  private boolean debugging = true;
+  private transient boolean debugging = true;
+
 
 
   public DataManager(String dir){
@@ -26,10 +28,14 @@ public class DataManager{
   }
 
   public DataManager(){
-    DIRECTORY = System.getProperty("user.dir") +"\\data"; //works in current subdirectory "data"
+    String cd = System.getProperty("user.dir"); //determines current working directory
+    if(cd.substring(cd.length()-5).equals("\\data"))
+      DIRECTORY = cd; //works in actual current working directory
+    else
+      DIRECTORY = cd +"\\data"; //works in current subdirectory "data"
   }
 
-  public void parseArgument(String argument) throws IllegalArgumentException{
+  public void parseArgument(String argument) throws IllegalArgumentException, IllegalCallerException{
     //-------EXAMPLE INPUT FORMAT--------
     //catagorys:filters:dates
     //cat1,cat2,catN:cat1.val1,cat2.(range1,range2),cat3.[val1,val2,val3]:date1-date2
@@ -45,7 +51,9 @@ public class DataManager{
                        : :D   false
                        : :    false */
 
-    //clear(); //removes previous arguments
+    //check if already ran before
+      if(argumentsAlreadyParsed)
+        throw new IllegalCallerException("Instances of DataManager can only parse one argument. Please create another instance for another argument.");
 
       if( argument.substring(0,2).equals("::") || argument.substring(argument.length()-1,argument.length()).equals(":") ){
         throw new IllegalArgumentException("Arguments must be in Catagories:Filters:Dates format");
@@ -167,9 +175,15 @@ public class DataManager{
       }
     }
 
+    //ensures this method is only ran once per instance of DataManager
+    argumentsAlreadyParsed = true;
+
+    importData();
   }
 
-  public void importData(){
+  public void importData() throws IllegalArgumentException{
+
+
     //ArrayList to hold all sucsessful rows through filtering
       ArrayList<String[]> filteredRows = new ArrayList<String[]>();
 
@@ -401,74 +415,99 @@ public class DataManager{
 
   }
 
-  public void sortBy(String inputCatagory){
-    //finds which catagory to sort by
-    int i = 0;
+  private int getCatatoryIndex(String inputCatagory){
     for(int x=0;x<DATA_CATAGORY.size();x++)
       if(inputCatagory.equalsIgnoreCase(DATA_CATAGORY.get(x)))
-        i = x;
+        return x;
+    //if nothing was found
+    return -1;
+  }
 
-    final int catIndex = i; //must be final for inner class
-
-    //conversion to normal array
-    String[][] dataArr = new String[DATA.size()][DATA.get(0).size()];
-    for(int x=0;x<DATA.size();x++){
-      for(int y=0;y<DATA.get(x).size();y++){
-        dataArr[x][y] = DATA.get(x).get(y);
-      }
-    }
-
-    class QuickSort{
-      public int partition(String arr[][], int low, int high){
-        int pivot = Integer.parseInt(arr[high][catIndex]);
+  public void sort(String inputCatagory){
+    //INNER CLASS: quick sort for 2D arraylist (DATA)
+    final int catIndex = getCatatoryIndex(inputCatagory); //must be final for inner class
+    class ArrayList2DQuickSort{
+      public int partition(ArrayList<ArrayList<String>> arr, int low, int high){
+        int pivot = Integer.parseInt(arr.get(high).get(catIndex));
         int i = low-1; // index of smaller element
         for(int j=low; j<high; j++){
-          // If current element is smaller than or
-          // equal to pivot
-          if(Integer.parseInt(arr[j][catIndex]) <= pivot){
+          if(Integer.parseInt(arr.get(j).get(catIndex)) <= pivot){
               i++;
-
-              // swap arr[i] and arr[j]
-              String[] temp = arr[i];
-              arr[i] = arr[j];
-              arr[j] = temp;
+              ArrayList<String> temp = arr.get(i);
+              arr.set(i, arr.get(j));
+              arr.set(j, temp);
           }
         }
-
-        // swap arr[i+1] and arr[high] (or pivot)
-        String[] temp = arr[i+1];
-        arr[i+1] = arr[high];
-        arr[high] = temp;
+        ArrayList<String> temp = arr.get(i+1);
+        arr.set((i+1), arr.get(high));
+        arr.set(high, temp);
 
         return i+1;
       }
 
-        /* The main function that implements QuickSort()
-          arr[] --> Array to be sorted,
-          low  --> Starting index,
-          high  --> Ending index */
-      public void sort(String arr[][], int low, int high){
+      public void sort(ArrayList<ArrayList<String>> arr, int low, int high){
         if(low < high){
-            /* pi is partitioning index, arr[pi] is
-              now at right place */
             int pi = partition(arr, low, high);
 
-            // Recursively sort elements before
-            // partition and after partition
             sort(arr, low, pi-1);
             sort(arr, pi+1, high);
         }
       }
     }
 
-    QuickSort qs = new QuickSort();
-    qs.sort(dataArr, 0, dataArr.length-1);
+    ArrayList2DQuickSort qs = new ArrayList2DQuickSort();
+    qs.sort(DATA, 0, DATA.size()-1);
+  }
 
-    for(int x=0;x<DATA.size();x++){
-      for(int y=0;y<DATA.get(x).size();y++){
-        DATA.get(x).set(y, dataArr[x][y]);
+  public LinkedHashMap<String,Integer> frequency(boolean sort, String... inputCatagory){
+
+    //counts each occurance
+    int[] catIndex = new int[inputCatagory.length];
+    for(int x=0;x<inputCatagory.length;x++){
+      catIndex[x] = getCatatoryIndex(inputCatagory[x]);
+    }
+
+    LinkedHashMap<String,Integer> freq = new LinkedHashMap<String,Integer>();
+    for(int i : catIndex)
+      for(int x=0;x<DATA.size();x++){
+        Integer j = freq.get(DATA.get(x).get(i));
+        freq.put(DATA.get(x).get(i), (j==null) ? 1 : j+1);
+      }
+
+    if(sort){
+      //Sorts freqencys based on the following list
+      LinkedList<Map.Entry<String,Integer>> list = new LinkedList<Map.Entry<String,Integer>>(freq.entrySet());
+
+      //sorts list
+      Collections.sort(list, new Comparator<Map.Entry<String,Integer>>(){
+        public int compare(Map.Entry<String,Integer> entry1, Map.Entry<String,Integer> entry2){
+            return (entry1.getValue()).compareTo(entry2.getValue());
+        }
+      });
+
+      //put data from sorted list to hashmap
+      LinkedHashMap<String,Integer> sortedFreq = new LinkedHashMap<String,Integer>();
+      for(Map.Entry<String,Integer> entry : list)
+          sortedFreq.put(entry.getKey(), entry.getValue());
+
+      //prints values
+      for(Map.Entry<String,Integer> entry : sortedFreq.entrySet()){
+        double percentage = 100*(double)entry.getValue()/DATA.size();
+        Object[] formatInput = {entry.getKey(), entry.getValue(), new String(""+Math.round(percentage*100.0)/100.0+"%")};
+        System.out.format("%55s%15s%15s\n",formatInput);
+      }
+      return sortedFreq;
+    }
+    if(!sort){
+      //prints values
+      for(Map.Entry<String,Integer> entry : freq.entrySet()){
+        Object[] formatInput = {entry.getKey(), entry.getValue(), (100*(double)entry.getValue()/DATA.size())};
+        System.out.format("%55s%15s%15s\n",formatInput);
       }
     }
+
+    return freq;
+
   }
 
   public ArrayList<ArrayList<String>> getData(){
@@ -497,11 +536,11 @@ public class DataManager{
   }
 
   public void printConditions(){
-    System.out.println("\nCATAGORIES:   "+Arrays.toString(CATAGORY)+"\n");
+    System.out.println("\nCATAGORIES:   "+Arrays.toString(CATAGORY));
       FILTER.entrySet().forEach(entry -> {
-        System.out.println("FILTERS:      (Key: ["+entry.getKey() + "], Value: " + Arrays.toString(entry.getValue().toArray())+")");
+        System.out.println("FILTER:      (Key: ["+entry.getKey() + "], Value: " + Arrays.toString(entry.getValue().toArray())+")");
       });
-    System.out.println("\nDATES:        "+Arrays.toString(DATE)+"\n");
+    System.out.println("DATES:        "+Arrays.toString(DATE)+"\n");
     System.out.print("\n");
   }
 
