@@ -1,7 +1,7 @@
-#My-AV-Data
+# My-AV-Data
 My-AV-Data is a program to display how DataManager can be used to read, visualize, and analyze commercial airplane data from the Bureau of Transportation Statistics (BST). My-AV-Data serves as an application of DataManager. DataManager, a general data input and management tool, is the majority of this program's implementation and will be discussed for the rest of the readme. My-AV-Data serves as a wrapper for the DataManager project to show off its more powerful features in the real world.
 
-#DataManager
+# DataManager
 DataManager enables large data sets to be analyzed efficiently by only loading the data you want across multiple files. For example, DataManager allows My-AV-Data to analyze 108 million data points accross over 5.7 million airline flights with efficiency. 
 
 DataManager instances are created my passing a String argument into the constructor. This string argument is parsed to collect the following information...
@@ -10,7 +10,7 @@ DataManager instances are created my passing a String argument into the construc
 * **filter** - Specific values under each header/collumn to import. For example, if you have a catagory (header/collumn from file) of data that stores a number between 1-10, but you only want to import data rows where this catagory is equal to 6, you would pass this into DataManager as a filter.
 * **dates** - The date files you want to import. For example, if you want to analyze data from January 2020 (2001) to April 2020 (2004), you would pass in this range of dates, and DataManager will import those respective files. 
 
-Arguments are constructed into three main segments like ```catagorys:filters:dates````, where each main segment is parsed by a ```:``` delimiter. 
+Arguments are constructed into three main segments like ```catagorys:filters:dates```, where each main segment is parsed by a ```:``` delimiter. 
 
 A complete argument follows this format: ```cat1,cat2,catN:cat1.val1,cat2.(range1,range2),cat3.[val1,val2,val3]:date1-date2```. Note the following...
 
